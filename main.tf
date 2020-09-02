@@ -7,39 +7,41 @@ resource "azurerm_resource_group" "resource_group" {
   name     = "resource-group-dmz"
   location = "East US"
 }
-# Create a virtual network.
+
+
 resource "azurerm_virtual_network" "vnet" {
-    name                = "dmzVnet"
-    address_space       = ["10.0.0.0/16"]
-    location            = "East US"
-    resource_group_name = azurerm_resource_group.resource_group.name
+  name                = "dmzVnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = "East US"
+  resource_group_name = azurerm_resource_group.resource_group.name
 }
+
 
 # Create subnets.
 resource "azurerm_subnet" "webTierSubnet" {
-    name           = "web_tier_subnet"
-    resource_group_name = azurerm_resource_group.resource_group.name
-    virtual_network_name = azurerm_virtual_network.vnet.name
-    address_prefixes = ["10.0.1.0/24"]
+  name                 = "web_tier_subnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_subnet" "businessTierSubnet" {
-    name           = "business_tier_subnet"
-    resource_group_name = azurerm_resource_group.resource_group.name
-    virtual_network_name = azurerm_virtual_network.vnet.name
-    address_prefixes = ["10.0.2.0/24"]
- }
-  resource "azurerm_subnet" "dataTierSubnet" {
-    name           = "data_tier_subnet"
-    resource_group_name = azurerm_resource_group.resource_group.name
-    virtual_network_name = azurerm_virtual_network.vnet.name
-    address_prefixes = ["10.0.3.0/24"]
+  name                 = "business_tier_subnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.2.0/24"]
+}
+resource "azurerm_subnet" "dataTierSubnet" {
+  name                 = "data_tier_subnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.3.0/24"]
 }
 resource "azurerm_subnet" "gatewaySubnet" {
-    name           = "gateway_subnet"
-    resource_group_name = azurerm_resource_group.resource_group.name
-    virtual_network_name = azurerm_virtual_network.vnet.name
-    address_prefixes = ["10.0.255.224/27"]
+  name                 = "gateway_subnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.255.224/27"]
 }
 
 # Create NSG and Network Security rules for Web Tier.
@@ -89,6 +91,7 @@ resource "azurerm_network_security_rule" "nsr_webTier3" {
   resource_group_name         = azurerm_resource_group.resource_group.name
   network_security_group_name = azurerm_network_security_group.nsg_webTier.name
 }
+
 resource "azurerm_network_security_rule" "nsr_webTier4" {
   name                        = "RDP3389"
   priority                    = 1004
@@ -97,10 +100,27 @@ resource "azurerm_network_security_rule" "nsr_webTier4" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "3389"
-  source_address_prefix       = "*"
+  source_address_prefix       = "10.0.0.0/27"
   destination_address_prefix  = "10.0.1.0/24"
   resource_group_name         = azurerm_resource_group.resource_group.name
   network_security_group_name = azurerm_network_security_group.nsg_webTier.name
+}
+resource "azurerm_network_security_rule" "nsr_webTier5" {
+  name                        = "RDP_3389"
+  priority                    = 1005
+  direction                   = "Outbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "3389"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "10.0.2.100"
+  resource_group_name         = azurerm_resource_group.resource_group.name
+  network_security_group_name = azurerm_network_security_group.nsg_webTier.name
+}
+resource "azurerm_subnet_network_security_group_association" "webTierSubnetAssociation" {
+  subnet_id                 = azurerm_subnet.webTierSubnet.id
+  network_security_group_id = azurerm_network_security_group.nsg_webTier.id
 }
 # Create NSG and Network Security rules for Business Tier.
 resource "azurerm_network_security_group" "nsg_businessTier" {
@@ -116,10 +136,27 @@ resource "azurerm_network_security_rule" "nsr_businessTier1" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "3389"
-  source_address_prefix       = "*"
+  source_address_prefix       = "10.0.1.0/24"
   destination_address_prefix  = "10.0.2.0/24"
   resource_group_name         = azurerm_resource_group.resource_group.name
   network_security_group_name = azurerm_network_security_group.nsg_businessTier.name
+}
+resource "azurerm_network_security_rule" "nsr_businessTier2" {
+  name                        = "RDP_webTier_3389"
+  priority                    = 1002
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "3389"
+  source_address_prefix       = "10.0.0.0/27"
+  destination_address_prefix  = "10.0.2.0/24"
+  resource_group_name         = azurerm_resource_group.resource_group.name
+  network_security_group_name = azurerm_network_security_group.nsg_businessTier.name
+}
+resource "azurerm_subnet_network_security_group_association" "businesTierSubnetAssociation" {
+  subnet_id                 = azurerm_subnet.businessTierSubnet.id
+  network_security_group_id = azurerm_network_security_group.nsg_businessTier.id
 }
 # Create NSG and Network Security rules for Data Tier.
 resource "azurerm_network_security_group" "nsg_dataTier" {
@@ -135,10 +172,27 @@ resource "azurerm_network_security_rule" "nsr_dataTier1" {
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "3389"
-  source_address_prefix       = "*"
+  source_address_prefix       = "10.0.2.0/24"
   destination_address_prefix  = "10.0.3.0/24"
   resource_group_name         = azurerm_resource_group.resource_group.name
   network_security_group_name = azurerm_network_security_group.nsg_dataTier.name
+}
+resource "azurerm_network_security_rule" "nsr_dataTier2" {
+  name                        = "RDP_businessTier_3389"
+  priority                    = 1002
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "3389"
+  source_address_prefix       = "10.0.0.0/27"
+  destination_address_prefix  = "10.0.3.0/24"
+  resource_group_name         = azurerm_resource_group.resource_group.name
+  network_security_group_name = azurerm_network_security_group.nsg_dataTier.name
+}
+resource "azurerm_subnet_network_security_group_association" "dataTierSubnetAssociation" {
+  subnet_id                 = azurerm_subnet.dataTierSubnet.id
+  network_security_group_id = azurerm_network_security_group.nsg_dataTier.id
 }
 # Create NSG and Network Security rules for Azure Bastion.
 resource "azurerm_network_security_group" "nsg_azbastion" {
@@ -174,6 +228,33 @@ resource "azurerm_network_security_rule" "nsr_azBastion2" {
   resource_group_name         = azurerm_resource_group.resource_group.name
   network_security_group_name = azurerm_network_security_group.nsg_azbastion.name
 }
+resource "azurerm_network_security_rule" "nsr_azBastion3" {
+  name                        = "web443"
+  priority                    = 1003
+  direction                   = "Outbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "443"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "10.0.0.0/16"
+  resource_group_name         = azurerm_resource_group.resource_group.name
+  network_security_group_name = azurerm_network_security_group.nsg_azbastion.name
+}
+resource "azurerm_network_security_rule" "nsr_azBastion4" {
+  name                        = "web_443"
+  priority                    = 1001
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "443"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.resource_group.name
+  network_security_group_name = azurerm_network_security_group.nsg_azbastion.name
+}
+
 # Create NIC.
 resource "azurerm_network_interface" "webTier" {
   name                = "webTier_nic"
@@ -385,10 +466,10 @@ resource "azurerm_windows_virtual_machine" "dataTierVm2" {
 #Create Azure Firewall.
 
 resource "azurerm_subnet" "azureFirewallSubnet" {
-  name           = "AzureFirewallSubnet"
-  resource_group_name = azurerm_resource_group.resource_group.name
+  name                 = "AzureFirewallSubnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes = ["10.0.4.0/24"]
+  address_prefixes     = ["10.0.4.0/24"]
 }
 
 resource "azurerm_public_ip" "publicIP" {
@@ -436,7 +517,7 @@ resource "azurerm_firewall_network_rule_collection" "azFirewallnsrcollection" {
     ]
     protocols = [
       "TCP",
-      "UDP",
+      "UDP"
     ]
   }
 }
@@ -449,20 +530,20 @@ resource "azurerm_route_table" "az_route_table" {
 }
 
 resource "azurerm_route" "webTierRoute" {
-  name                = "webTierRoute1"
-  resource_group_name = azurerm_resource_group.resource_group.name
-  route_table_name    = azurerm_route_table.az_route_table.name
-  address_prefix = "10.0.1.0/24"
-  next_hop_type  = "VirtualAppliance"
+  name                   = "webTierRoute1"
+  resource_group_name    = azurerm_resource_group.resource_group.name
+  route_table_name       = azurerm_route_table.az_route_table.name
+  address_prefix         = "10.0.1.0/24"
+  next_hop_type          = "VirtualAppliance"
   next_hop_in_ip_address = "10.0.4.4"
 }
 
 # Create Azure Bastion
 resource "azurerm_subnet" "azBastionSubnet" {
-    name           = "AzureBastionSubnet"
-    resource_group_name = azurerm_resource_group.resource_group.name 
-    virtual_network_name = azurerm_virtual_network.vnet.name
-    address_prefixes = ["10.0.0.0/27"]
+  name                 = "AzureBastionSubnet"
+  resource_group_name  = azurerm_resource_group.resource_group.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.0.0/27"]
 }
 
 resource "azurerm_public_ip" "azBastionPublicIp" {
@@ -502,14 +583,16 @@ resource "azurerm_lb" "loadbalancerWebTier" {
   frontend_ip_configuration {
     name                 = "PublicIPAddress"
     public_ip_address_id = azurerm_public_ip.loadBalanceriPWebTier.id
-    private_ip_address = "10.0.1.100"
+    private_ip_address   = "10.0.1.100"
   }
 }
+
 resource "azurerm_lb_backend_address_pool" "lbBackendPool" {
   resource_group_name = azurerm_resource_group.resource_group.name
   loadbalancer_id     = azurerm_lb.loadbalancerWebTier.id
   name                = "BackEndAddressPool"
 }
+
 resource "azurerm_lb_rule" "lbRule" {
   resource_group_name            = azurerm_resource_group.resource_group.name
   loadbalancer_id                = azurerm_lb.loadbalancerWebTier.id
@@ -518,4 +601,94 @@ resource "azurerm_lb_rule" "lbRule" {
   frontend_port                  = 3389
   backend_port                   = 3389
   frontend_ip_configuration_name = "PublicIPAddress"
+}
+
+resource "azurerm_network_interface_backend_address_pool_association" "backendPoolAddressWebTier" {
+  network_interface_id    = azurerm_network_interface.webTier.id
+  ip_configuration_name   = "ipconfiguration_web"
+  backend_address_pool_id = azurerm_lb_backend_address_pool.lbBackendPool.id
+}
+# Create load balancer for Business Tier.
+
+resource "azurerm_public_ip" "loadBalanceriPBusinessTier" {
+  name                = "PublicIPForLBbusinessTier"
+  location            = "East US"
+  resource_group_name = azurerm_resource_group.resource_group.name
+  allocation_method   = "Static"
+}
+
+resource "azurerm_lb" "loadbalancerBusinessTier" {
+  name                = "TestLoadBalancerBusinessTier"
+  location            = "East US"
+  resource_group_name = azurerm_resource_group.resource_group.name
+
+  frontend_ip_configuration {
+    name                 = "PublicIPAddress"
+    public_ip_address_id = azurerm_public_ip.loadBalanceriPBusinessTier.id
+    private_ip_address   = "10.0.2.100"
+  }
+}
+
+resource "azurerm_lb_backend_address_pool" "lbBackendPoolBusinessTier" {
+  resource_group_name = azurerm_resource_group.resource_group.name
+  loadbalancer_id     = azurerm_lb.loadbalancerBusinessTier.id
+  name                = "BackEndAddressPoolBusinessTier"
+}
+
+resource "azurerm_lb_rule" "lbRuleBusinessTier" {
+  resource_group_name            = azurerm_resource_group.resource_group.name
+  loadbalancer_id                = azurerm_lb.loadbalancerBusinessTier.id
+  name                           = "LBRule1"
+  protocol                       = "Tcp"
+  frontend_port                  = 3389
+  backend_port                   = 3389
+  frontend_ip_configuration_name = "PublicIPAddress"
+}
+
+resource "azurerm_network_interface_backend_address_pool_association" "backendPoolAddressBusinessTier" {
+  network_interface_id    = azurerm_network_interface.businessTier.id
+  ip_configuration_name   = "ipconfiguration_business"
+  backend_address_pool_id = azurerm_lb_backend_address_pool.lbBackendPoolBusinessTier.id
+}
+# Create load balancer for Data Tier.
+
+resource "azurerm_public_ip" "loadBalanceriPDataTier" {
+  name                = "PublicIPForLBdataTier"
+  location            = "East US"
+  resource_group_name = azurerm_resource_group.resource_group.name
+  allocation_method   = "Static"
+}
+
+resource "azurerm_lb" "loadbalancerDataTier" {
+  name                = "TestLoadBalancerDataTier"
+  location            = "East US"
+  resource_group_name = azurerm_resource_group.resource_group.name
+
+  frontend_ip_configuration {
+    name                 = "PublicIPAddress"
+    public_ip_address_id = azurerm_public_ip.loadBalanceriPDataTier.id
+    private_ip_address   = "10.0.3.100"
+  }
+}
+
+resource "azurerm_lb_backend_address_pool" "lbBackendPoolDataTier" {
+  resource_group_name = azurerm_resource_group.resource_group.name
+  loadbalancer_id     = azurerm_lb.loadbalancerDataTier.id
+  name                = "BackEndAddressPoolDataTier"
+}
+
+resource "azurerm_lb_rule" "lbRuleDataTier" {
+  resource_group_name            = azurerm_resource_group.resource_group.name
+  loadbalancer_id                = azurerm_lb.loadbalancerDataTier.id
+  name                           = "LBRuleDataTier"
+  protocol                       = "Tcp"
+  frontend_port                  = 3389
+  backend_port                   = 3389
+  frontend_ip_configuration_name = "PublicIPAddress"
+}
+
+resource "azurerm_network_interface_backend_address_pool_association" "backendPoolAddressDataTier" {
+  network_interface_id    = azurerm_network_interface.dataTier.id
+  ip_configuration_name   = "ipconfiguration_data"
+  backend_address_pool_id = azurerm_lb_backend_address_pool.lbBackendPoolDataTier.id
 }
