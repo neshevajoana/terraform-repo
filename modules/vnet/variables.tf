@@ -1,6 +1,6 @@
 variable "name" {
   type    = string
-  default = "dmzVnet"
+  default = "virtual_network_dmz"
 }
 variable "address_space" {
   type = list(string)
